@@ -64,10 +64,10 @@ VAR dir = none
 Ход {turns}, очки {score}/{goal}, длина {len}
 Голова ({head_x},{head_y}), яблоко ({apple_x},{apple_y})
 
-* Вверх (if dir != down) -> move_up
-* Вниз (if dir != up) -> move_down
-* Влево (if dir != right) -> move_left
-* Вправо (if dir != left) -> move_right
+* {dir != down} Вверх -> move_up
+* {dir != up} Вниз -> move_down
+* {dir != right} Влево -> move_left
+* {dir != left} Вправо -> move_right
 
 // ---------- ходы ----------
 
@@ -231,7 +231,7 @@ VAR dir = none
 // ---------- концовки ----------
 
 === dead ===
-Змейка {head_x},{head_y} — и ты врезался {if dir == up:в потолок|{if dir == down:в пол|{if dir == left:в левую стену|в правую стену}}}.
+Змейка {head_x},{head_y} — и ты врезался {dir == up:в потолок|{dir == down:в пол|{dir == left:в левую стену|в правую стену}}}.
 
 Ходов сделано: {turns}. Яблок съедено: {score} из {goal}.
 

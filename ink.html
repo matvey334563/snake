@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Змейка — текстовая версия на Ink</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; min-height: 100%;
+    background: #060a06;
+    font-family: "Consolas", "Courier New", monospace;
+    color: #9fe8a0;
+  }
+  body { display: flex; justify-content: center; padding: 20px; }
+  .box {
+    width: 100%; max-width: 680px;
+    background: #0b120b;
+    border: 1px solid #1e3a1e;
+    border-radius: 10px;
+    box-shadow: 0 0 40px rgba(74, 222, 128, .08);
+    overflow: hidden;
+  }
+  header {
+    background: #122012;
+    padding: 12px 18px;
+    color: #4ade80;
+    font-weight: bold;
+    letter-spacing: 2px;
+    border-bottom: 1px solid #1e3a1e;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+  }
+  header a { color: #86efac; font-size: 13px; text-decoration: none; border-bottom: 1px dashed #4ade8066; }
+  header a:hover { color: #fff; }
+  #log {
+    padding: 16px 18px;
+    min-height: 260px;
+    max-height: 55vh;
+    overflow-y: auto;
+    line-height: 1.55;
+    font-size: 15px;
+    white-space: pre-wrap;
+  }
+  #log p { margin: 0 0 10px; }
+  #log .sys { color: #6b7f6b; font-style: italic; }
+  #log .good { color: #fbbf24; }
+  #choices {
+    border-top: 1px dashed #1e3a1e;
+    padding: 14px 18px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  button {
+    font: inherit;
+    text-align: left;
+    background: #122012;
+    color: #a7f3a8;
+    border: 1px solid #2b522b;
+    border-radius: 7px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background .12s, transform .05s;
+  }
+  button:hover { background: #1b331b; border-color: #4ade80; color: #d9ffe0; }
+  button:active { transform: translateY(1px); }
+  button::before { content: "▸ "; color: #4ade80; }
+  #loading { color: #6b7f6b; padding: 18px; }
+  footer { padding: 10px 18px; font-size: 12px; color: #4b5f4b; }
+</style>
+</head>
+<body>
+<div class="box">
+  <header>
+    <span>🐍 ЗМЕЙКА · ТЕКСТОВАЯ ВЕРСИЯ</span>
+    <a href="./">← графическая версия</a>
+  </header>
+  <div id="log"></div>
+  <div id="choices"><div id="loading">Компилирую snake.ink…</div></div>
+  <footer>Игра исполняется из файла snake.ink прямо в браузере (inkjs compiler)</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/inkjs@2.3.0/dist/ink.js"></script>
+<script>
+  const log = document.getElementById('log');
+  const choicesBox = document.getElementById('choices');
+  let story = null;
+
+  function append(text, cls) {
+    text.split('\n').filter(l => l.trim() !== '').forEach(line => {
+      const p = document.createElement('p');
+      if (cls) p.className = cls;
+      p.textContent = line;
+      log.appendChild(p);
+    });
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function render() {
+    while (story.canContinue) {
+      append(story.Continue());
+    }
+    choicesBox.innerHTML = '';
+    if (!story.currentChoices.length) {
+      const b = document.createElement('button');
+      b.textContent = 'Начать заново';
+      b.onclick = () => { story.ResetState(); render(); };
+      choicesBox.appendChild(b);
+      return;
+    }
+    story.currentChoices.forEach(c => {
+      const b = document.createElement('button');
+      b.textContent = c.text;
+      b.onclick = () => { story.ChooseChoiceIndex(c.index); render(); };
+      choicesBox.appendChild(b);
+    });
+  }
+
+  fetch('snake.ink')
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(src => {
+      story = new inkjs.Compiler(src).Compile();
+      append('== Змейка и яблоки (ink-сценарий загружен) ==', 'sys');
+      render();
+    })
+    .catch(err => {
+      choicesBox.innerHTML = '';
+      append('Не удалось загрузить snake.ink: ' + err.message, 'sys');
+      const b = document.createElement('button');
+      b.textContent = 'Повторить';
+      b.onclick = () => location.reload();
+      choicesBox.appendChild(b);
+    });
+</script>
+</body>
+</html>

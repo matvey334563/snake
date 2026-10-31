@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Змейка и яблоки</title>
+<style>
+  :root {
+    --bg: #0f1220;
+    --panel: #181c30;
+    --accent: #4ade80;
+    --accent2: #f87171;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: radial-gradient(circle at 50% 0%, #1a2038 0%, var(--bg) 70%);
+    color: #e5e7eb;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+  }
+  .wrap { text-align: center; }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 26px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-shadow: 0 0 18px rgba(74, 222, 128, .35);
+  }
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 520px;
+    margin: 0 auto 8px;
+    font-size: 15px;
+    gap: 12px;
+  }
+  .hud .box {
+    background: var(--panel);
+    border: 1px solid #2a3050;
+    border-radius: 10px;
+    padding: 6px 14px;
+  }
+  .hud b { color: #fbbf24; font-variant-numeric: tabular-nums; }
+  canvas {
+    background: #10142a;
+    border: 2px solid #2a3050;
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.5), 0 0 40px rgba(74,222,128,.08);
+    display: block;
+    max-width: 100%;
+  }
+  .controls {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #8b93b5;
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  kbd {
+    background: #232a45;
+    border: 1px solid #39416a;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-family: inherit;
+    font-size: 12px;
+    color: #cbd2f0;
+  }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 10, 20, .78);
+    backdrop-filter: blur(3px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h2 { margin: 0; font-size: 34px; color: #fbbf24; }
+  .overlay p { margin: 0; color: #aab2d6; }
+  .btn {
+    margin-top: 6px;
+    background: var(--accent);
+    color: #06230f;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 34px;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .1s, box-shadow .2s;
+    box-shadow: 0 6px 20px rgba(74,222,128,.3);
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn:active { transform: translateY(1px); }
+  .btn.pause { background: #fbbf24; box-shadow: 0 6px 20px rgba(251,191,36,.25); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🐍 Змейка и яблоки</h1>
+  <div class="hud">
+    <div class="box">Счёт: <b id="score">0</b></div>
+    <div class="box">Рекорд: <b id="best">0</b></div>
+    <button class="btn pause" id="pauseBtn" style="padding:6px 16px;font-size:14px;">Пауза</button>
+  </div>
+  <canvas id="game" width="480" height="480"></canvas>
+  <div class="controls">
+    <span><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> или <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> — движение</span>
+    <span><kbd>Пробел</kbd> — пауза</span>
+    <span>На телефоне — свайпы</span>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <h2 id="ovTitle">Змейка и яблоки</h2>
+  <p id="ovText">Собирай яблоки, расти и не врезайся!</p>
+  <p id="ovScore"></p>
+  <button class="btn" id="ovBtn">Играть</button>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const overlay = document.getElementById('overlay');
+  const ovTitle = document.getElementById('ovTitle');
+  const ovText = document.getElementById('ovText');
+  const ovScore = document.getElementById('ovScore');
+  const ovBtn = document.getElementById('ovBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  const COLS = 24;
+  const ROWS = 24;
+  const CELL = canvas.width / COLS;
+  const START_SPEED = 150;   // мс на шаг
+  const MIN_SPEED = 70;
+  const SPEED_STEP = 3;
+
+  let snake, dir, nextDir, apple, score, best, speed, alive, paused, started;
+  let lastTick = 0;
+  let particles = [];
+  let applePop = 0;
+  best = Number(localStorage.getItem('snakeBest') || 0);
+  bestEl.textContent = best;
+
+  function reset() {
+    snake = [{x: 8, y: 12}, {x: 7, y: 12}, {x: 6, y: 12}];
+    dir = {x: 1, y: 0};
+    nextDir = dir;
+    score = 0;
+    speed = START_SPEED;
+    scoreEl.textContent = 0;
+    spawnApple();
+    particles = [];
+    alive = true;
+    paused = false;
+    started = true;
+    overlay.classList.add('hidden');
+    pauseBtn.textContent = 'Пауза';
+    lastTick = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function spawnApple() {
+    let free = [];
+    for (let x = 0; x < COLS; x++)
+      for (let y = 0; y < ROWS; y++)
+        if (!snake.some(s => s.x === x && s.y === y)) free.push({x, y});
+    apple = free[Math.floor(Math.random() * free.length)] || {x: 0, y: 0};
+    applePop = 1;
+  }
+
+  function setDir(x, y) {
+    // нельзя разворачиваться на 180°
+    if (x === -dir.x && y === -dir.y) return;
+    nextDir = {x, y};
+  }
+
+  function step() {
+    dir = nextDir;
+    const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+    // столкновение со стенами или с собой
+    if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS ||
+        snake.some((s, i) => i < snake.length - 1 && s.x === head.x && s.y === head.y)) {
+      return gameOver();
+    }
+
+    snake.unshift(head);
+
+    if (head.x === apple.x && head.y === apple.y) {
+      score++;
+      scoreEl.textContent = score;
+      speed = Math.max(MIN_SPEED, speed - SPEED_STEP);
+      burst(apple.x, apple.y);
+      spawnApple();
+    } else {
+      snake.pop();
+    }
+  }
+
+  function burst(x, y) {
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = 1 + Math.random() * 3;
+      particles.push({
+        x: x * CELL + CELL / 2,
+        y: y * CELL + CELL / 2,
+        vx: Math.cos(a) * v,
+        vy: Math.sin(a) * v,
+        life: 1,
+        color: Math.random() < .5 ? '#ef4444' : '#fbbf24'
+      });
+    }
+  }
+
+  function gameOver() {
+    alive = false;
+    if (score > best) {
+      best = score;
+      localStorage.setItem('snakeBest', best);
+      bestEl.textContent = best;
+    }
+    ovTitle.textContent = 'Игра окончена';
+    ovText.textContent = score >= best && score > 0 ? '🎉 Новый рекорд!' : 'Попробуй ещё раз!';
+    ovScore.textContent = `Счёт: ${score}  •  Рекорд: ${best}`;
+    ovBtn.textContent = 'Заново';
+    overlay.classList.remove('hidden');
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // сетка
+    ctx.strokeStyle = 'rgba(255,255,255,.035)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= COLS; i++) {
+      ctx.beginPath(); ctx.moveTo(i * CELL, 0); ctx.lineTo(i * CELL, canvas.height); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * CELL); ctx.lineTo(canvas.width, i * CELL); ctx.stroke();
+    }
+
+    // яблоко
+    if (apple) {
+      const px = apple.x * CELL + CELL / 2;
+      const py = apple.y * CELL + CELL / 2;
+      const t = applePop > 0 ? 1 + applePop * 0.4 : 1 + Math.sin(performance.now() / 250) * 0.05;
+      applePop = Math.max(0, applePop - 0.08);
+
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.scale(t, t);
+
+      // блестка
+      ctx.fillStyle = 'rgba(239,68,68,.18)';
+      ctx.beginPath(); ctx.arc(0, 0, CELL * 0.62, 0, Math.PI * 2); ctx.fill();
+
+      // яблоко
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath(); ctx.arc(-CELL * 0.14, 2, CELL * 0.28, 0, Math.PI * 2);
+      ctx.arc(CELL * 0.14, 2, CELL * 0.28, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath(); ctx.arc(0, CELL * 0.1, CELL * 0.3, 0, Math.PI * 2); ctx.fill();
+
+      // хвостик и листик
+      ctx.strokeStyle = '#78350f'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, -CELL * 0.12); ctx.lineTo(2, -CELL * 0.34); ctx.stroke();
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath();
+      ctx.ellipse(CELL * 0.16, -CELL * 0.32, CELL * 0.14, CELL * 0.07, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // змейка
+    snake.forEach((s, i) => {
+      const head = i === 0;
+      const x = s.x * CELL, y = s.y * CELL;
+      const pad = head ? 1 : 2;
+
+      ctx.fillStyle = head ? '#86efac' : `rgba(74, 222, 128, ${1 - i / (snake.length + 6)})`;
+      roundRect(x + pad, y + pad, CELL - pad * 2, CELL - pad * 2, head ? 7 : 5);
+      ctx.fill();
+
+      if (i > 0) {
+        ctx.fillStyle = 'rgba(6, 95, 70, .45)';
+        ctx.beginPath();
+        ctx.arc(x + CELL / 2, y + CELL / 2, CELL * 0.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // глаза
+      if (head) {
+        const cx = x + CELL / 2, cy = y + CELL / 2;
+        const ex = dir.x * CELL * 0.16, ey = dir.y * CELL * 0.16;
+        const side = {x: -dir.y, y: dir.x};
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(cx + ex + side.x * CELL * 0.16, cy + ey + side.y * CELL * 0.16, CELL * 0.11, 0, Math.PI * 2);
+        ctx.arc(cx + ex - side.x * CELL * 0.16, cy + ey - side.y * CELL * 0.16, CELL * 0.11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(cx + ex + side.x * CELL * 0.16 + dir.x, cy + ey + side.y * CELL * 0.16 + dir.y, CELL * 0.055, 0, Math.PI * 2);
+        ctx.arc(cx + ex - side.x * CELL * 0.16 + dir.x, cy + ey - side.y * CELL * 0.16 + dir.y, CELL * 0.055, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+
+    // частицы
+    particles = particles.filter(p => p.life > 0);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 0.03;
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+      ctx.globalAlpha = 1;
+    });
+
+    if (paused) {
+      ctx.fillStyle = 'rgba(8,10,20,.6)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 34px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2);
+      ctx.font = '15px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#aab2d6';
+      ctx.fillText('Пробел — продолжить', canvas.width / 2, canvas.height / 2 + 32);
+    }
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function loop(now) {
+    if (alive && !paused && now - lastTick >= speed) {
+      lastTick = now;
+      step();
+    }
+    draw();
+    if (alive) requestAnimationFrame(loop);
+  }
+
+  // ---- управление ----
+  document.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) e.preventDefault();
+    if (k === 'arrowup' || k === 'w' || k === 'ц') setDir(0, -1);
+    else if (k === 'arrowdown' || k === 's' || k === 'ы') setDir(0, 1);
+    else if (k === 'arrowleft' || k === 'a' || k === 'ф') setDir(-1, 0);
+    else if (k === 'arrowright' || k === 'd' || k === 'в') setDir(1, 0);
+    else if (k === ' ') togglePause();
+  });
+
+  function togglePause() {
+    if (!alive || !started) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? 'Продолжить' : 'Пауза';
+    if (!paused) lastTick = performance.now();
+    draw();
+  }
+  pauseBtn.addEventListener('click', togglePause);
+  ovBtn.addEventListener('click', reset);
+
+  // свайпы
+  let tx = 0, ty = 0;
+  canvas.addEventListener('touchstart', e => {
+    tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+  }, {passive: true});
+  canvas.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    const dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+    if (Math.abs(dx) > Math.abs(dy)) setDir(Math.sign(dx), 0);
+    else setDir(0, Math.sign(dy));
+  }, {passive: true});
+
+  // стартовый экран
+  draw();
+})();
+</script>
+</body>
+</html>

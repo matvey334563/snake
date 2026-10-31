@@ -154,11 +154,20 @@
   const MIN_SPEED = 70;
   const SPEED_STEP = 3;
 
-  let snake, dir, nextDir, apple, score, best, speed, alive, paused, started;
+  // стартовое состояние — чтобы draw() можно было вызвать до нажатия «Играть»
+  let snake = [{x: 8, y: 12}, {x: 7, y: 12}, {x: 6, y: 12}];
+  let dir = {x: 1, y: 0};
+  let nextDir = dir;
+  let apple = {x: 16, y: 12};
+  let score = 0;
+  let speed = START_SPEED;
+  let alive = false;
+  let paused = false;
+  let started = false;
+  let best = Number(localStorage.getItem('snakeBest') || 0);
   let lastTick = 0;
   let particles = [];
   let applePop = 0;
-  best = Number(localStorage.getItem('snakeBest') || 0);
   bestEl.textContent = best;
 
   function reset() {

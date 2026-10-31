@@ -64,10 +64,10 @@ VAR dir = none
 Ход {turns}, очки {score}/{goal}, длина {len}
 Голова ({head_x},{head_y}), яблоко ({apple_x},{apple_y})
 
-* {dir != down} Вверх -> move_up
-* {dir != up} Вниз -> move_down
-* {dir != right} Влево -> move_left
-* {dir != left} Вправо -> move_right
++ {dir != down} Вверх -> move_up
++ {dir != up} Вниз -> move_down
++ {dir != right} Влево -> move_left
++ {dir != left} Вправо -> move_right
 
 // ---------- ходы ----------
 

@@ -36,6 +36,8 @@ VAR b5y = -1
 LIST dirs = none, up, down, left, right
 VAR dir = none
 
+-> start
+
 === start ===
 Ты — змейка на поле 6×6.
 Координаты углов: (0,0) сверху слева, (5,5) снизу справа.
